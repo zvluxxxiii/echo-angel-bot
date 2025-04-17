@@ -3,15 +3,17 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.enums import ParseMode
 
-API_TOKEN = "7307810781:AAFUOkaJr1YfbYrMVa6J6wV6xUuesG1zDF8"
+# ТВОЙ токен и ID группы
+TOKEN = "7307810781:AAFUOkaJr1YfbYrMVa6J6wV6xUuesG1zDF8"
 GROUP_ID = -1002294772560
 
-bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
-# Кэш связи: ID сообщения в группе → ID пользователя
-message_links = {}
+# Память: ID сообщения в группе → ID пользователя
+user_links = {}
 
+# Приветствие
 WELCOME_TEXT = """
 ⋆｡°✩₊
 /ᐠ – ˕ –マ
@@ -34,31 +36,36 @@ WELCOME_TEXT = """
 укажи хештег в конце сообщения — например: #мики
 """
 
-# Приветствие на /start
+# Отправка приветствия на /start
 @dp.message(F.text == "/start", F.chat.type == "private")
-async def send_welcome(message: Message):
+async def handle_start(message: Message):
     await message.answer(WELCOME_TEXT)
 
-# Пересылка сообщений из ЛС в группу
+# Пересылка ЛС → в группу
 @dp.message(F.chat.type == "private", F.text)
-async def handle_private(message: Message):
-    username = message.from_user.username or "без ника"
+async def handle_private_message(message: Message):
     user_id = message.from_user.id
-    text = message.text or "(пусто)"
+    username = message.from_user.username or "без ника"
+    text = message.text
 
-    sent = await bot.send_message(
+    forwarded = await bot.send_message(
         GROUP_ID,
         f"<b>✉️ Сообщение от @{username} (ID: <code>{user_id}</code>):</b>\n\n<i>{text}</i>"
     )
-    # Запоминаем ID отправителя
-    message_links[sent.message_id] = user_id
+    user_links[forwarded.message_id] = user_id
 
-# Ответы админов → пользователю
+# Ответ из группы → в личку
 @dp.message(F.chat.id == GROUP_ID, F.reply_to_message)
-async def reply_from_admin(message: Message):
-    original = message.reply_to_message
-    original_id = original.message_id
+async def handle_group_reply(message: Message):
+    replied_id = message.reply_to_message.message_id
 
-    if original_id in message_links:
-        user_id = message_links[original_id]
+    if replied_id in user_links:
+        user_id = user_links[replied_id]
         await bot.send_message(chat_id=user_id, text=message.text)
+
+# Запуск бота
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
