@@ -2,48 +2,64 @@ import asyncio
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
 
-# Токен и ID твоей группы
-TOKEN = "7307810781:AAFUOkaJr1YfbYrMVa6J6wV6xUuesG1zDF8"
+API_TOKEN = "7307810781:AAFUOkaJr1YfbYrMVa6J6wV6xUuesG1zDF8"
 GROUP_ID = -1002294772560
 
-# Инициализация
-bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
-# Приветствие по /start
-@dp.message(CommandStart())
-async def handle_start(message: Message):
-    await message.answer(
-        "<b>⋆｡°✩₊</b>\n"
-        "/ᐠ – ˕ –マ\n\n"
-        "<b>Привет. Это “Эхо с небес”.</b>\n"
-        "Если тебе тяжело — напиши.\n"
-        "Мы не судим, не исправляем, не умничаем.\n"
-        "Мы просто рядом.\n\n"
-        "✩ ꒰՞•ﻌ•՞꒱\n"
-        "Ты не один.\n"
-        "Ты не одна.\n"
-        "И это место — для тебя.\n\n"
-        "⭒ﾟ･｡☆･｡\n"
-        "Ответ может прийти не сразу,\n"
-        "но тебя обязательно услышат.\n\n"
-        "Чтобы написать конкретному админу,\n"
-        "укажи хештег в конце сообщения — например: #мики"
-    )
+# Приветствие
+WELCOME_TEXT = """
+/⌒ - ⌒⌒
 
-# Пересылка сообщений в группу
-@dp.message(F.chat.type == "private", F.text)
-async def forward_to_group(message: Message):
-    text = (
-        f"✉️ Сообщение от @{message.from_user.username or 'без ника'} "
-        f"(ID: <code>{message.from_user.id}</code>):\n\n"
-        f"{message.text}"
-    )
-    await bot.send_message(GROUP_ID, text)
+Привет. Это <b>эхо с небес</b>.
+Если тебе тяжело — напиши.
+Мы не судим, не исправляем, не уничтожаем.
+Мы просто рядом.
 
-# Запуск бота
+☆ ꒰❛‿˂̵✧ ꒱
+
+Ты не один.
+Ты не одна.
+И это место — для тебя.
+
+☁️☁️☁️
+
+Ответ может прийти не сразу,
+но тебя обязательно услышат.
+
+Чтобы написать конкретному админу,
+укажи хештег в конце сообщения —
+например: #ник
+"""
+
+# Обработка сообщений из лички
+@dp.message(F.chat.type == "private")
+async def handle_private_message(message: Message):
+    username = message.from_user.username or "без ника"
+    user_id = message.from_user.id
+    text = message.text or "(без текста)"
+    
+    # Отправка в группу
+    formatted = (
+        f"✉️ Сообщение от @{username} (ID: <code>{user_id}</code>):\n\n"
+        f"<i>{text}</i>"
+    )
+    await bot.send_message(chat_id=GROUP_ID, text=formatted)
+
+    # Приветствие пользователю
+    await message.answer(WELCOME_TEXT)
+
+# Обработка сообщений из группы
+@dp.message(F.chat.id == GROUP_ID)
+async def handle_group_message(message: Message):
+    if message.reply_to_message:
+        await message.reply("Бот получил это сообщение!")
+    else:
+        pass
+
+# Запуск
 async def main():
     await dp.start_polling(bot)
 
