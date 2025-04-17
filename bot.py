@@ -9,6 +9,9 @@ GROUP_ID = -1002294772560
 bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
+# Кэш связи: ID сообщения в группе → ID пользователя
+message_links = {}
+
 WELCOME_TEXT = """
 ⋆｡°✩₊
 /ᐠ – ˕ –マ
@@ -31,35 +34,31 @@ WELCOME_TEXT = """
 укажи хештег в конце сообщения — например: #мики
 """
 
-# Команда старт — приветствие
+# Приветствие на /start
 @dp.message(F.text == "/start", F.chat.type == "private")
 async def send_welcome(message: Message):
     await message.answer(WELCOME_TEXT)
 
-# Сообщение от пользователя — бот отправляет в группу
-@dp.message(F.chat.type == "private")
-async def forward_to_group(message: Message):
+# Пересылка сообщений из ЛС в группу
+@dp.message(F.chat.type == "private", F.text)
+async def handle_private(message: Message):
     username = message.from_user.username or "без ника"
     user_id = message.from_user.id
-    forwarded = await bot.send_message(
-        chat_id=GROUP_ID,
-        text=(
-            f"<b>✉️ Новое сообщение от @{username} (ID: <code>{user_id}</code>):</b>\n\n"
-            f"<i>{message.text}</i>"
-        ),
-        reply_markup=None
-    )
-    # Сохраняем user_id как reply_to_message для ответа из группы
-    forwarded.message_thread_id = user_id
+    text = message.text or "(пусто)"
 
-# Ответ админа из группы — бот отправляет пользователю
+    sent = await bot.send_message(
+        GROUP_ID,
+        f"<b>✉️ Сообщение от @{username} (ID: <code>{user_id}</code>):</b>\n\n<i>{text}</i>"
+    )
+    # Запоминаем ID отправителя
+    message_links[sent.message_id] = user_id
+
+# Ответы админов → пользователю
 @dp.message(F.chat.id == GROUP_ID, F.reply_to_message)
-async def reply_to_user(message: Message):
-    try:
-        # Получаем ID пользователя из текста сообщения, на которое отвечают
-        reply_text = message.reply_to_message.text
-        if "ID:" in reply_text:
-            user_id = int(reply_text.split("ID: <code>")[1].split("</code>")[0])
-            await bot.send_message(chat_id=user_id, text=message.text)
-    except Exception as e:
-        print(f"Ошибка пересылки: {e}")
+async def reply_from_admin(message: Message):
+    original = message.reply_to_message
+    original_id = original.message_id
+
+    if original_id in message_links:
+        user_id = message_links[original_id]
+        await bot.send_message(chat_id=user_id, text=message.text)
